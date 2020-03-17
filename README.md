@@ -1,1 +1,2 @@
-# boltzmann-machines
+# pybm
+
