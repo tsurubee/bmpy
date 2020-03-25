@@ -19,6 +19,15 @@ class RBM:
         self.__contrastive_divergence(self.data, n_epochs, n_CD)
         print("Training finished")
 
+    def sample(self, n_iter=5, v_init=None):
+        if v_init is None:
+            v_init = np.random.rand(self.n_visible)
+        v_t = v_init.reshape(self.n_visible)
+        for _ in range(n_iter):
+            h_t = self.__forward(v_t)
+            v_t = self.__backward(h_t)
+        return v_t
+
     def sigmoid(self, x):
         return 1 / (1 + np.exp(-x))
 
