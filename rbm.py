@@ -3,15 +3,16 @@ import numpy as np
 import torch
 
 class RBM:
-    def __init__(self, n_visible=784, n_hidden=2, alpha=0.01):
+    def __init__(self, n_visible=784, n_hidden=2, alpha=0.01, device='cpu'):
         self.n_visible = n_visible
         self.n_hidden  = n_hidden
         self.alpha     = alpha
+        self.device    = device
 
         self.data = None
-        self.weight = np.random.rand(self.n_visible, self.n_hidden)
-        self.b = np.random.rand(self.n_visible)
-        self.c = np.random.rand(self.n_hidden)
+        self.weight = torch.rand(self.n_visible, self.n_hidden).to(self.device)
+        self.b = torch.rand(self.n_visible).to(self.device)
+        self.c = torch.rand(self.n_hidden).to(self.device)
         self.energy_records = []
 
     def train(self, data, n_epochs=2, n_CD=1):
@@ -22,8 +23,8 @@ class RBM:
 
     def sample(self, n_iter=5, v_init=None):
         if v_init is None:
-            v_init = np.random.rand(self.n_visible)
-        v_t = v_init.reshape(self.n_visible)
+            v_init = np.random.rand(self.n_visible).to(self.device)
+        v_t = v_init.view(self.n_visible)
         for _ in range(n_iter):
             h_t = self.__forward(v_t)
             v_t = self.__backward(h_t)
@@ -47,7 +48,7 @@ class RBM:
                                 torch.matmul(v_sampled.view(-1, 1), h_sampled.view(1, -1)))
                 self.b += self.alpha * (v_0 - v_sampled)
                 self.c += self.alpha * (h0_sampled - h_sampled)
-                self.energy_list.append(self._energy(v_0, h_sampled))
+                self.energy_list.append(self._energy(v_0, h_sampled).item())
 
             end = time.time()
             avg_energy = np.mean(self.energy_list)
@@ -68,8 +69,8 @@ class RBM:
 
     def __sampling(self, p):
         dim = p.shape[0]
-        true_list = torch.rand(dim) <= p
-        sampled = torch.zeros(dim)
+        true_list = torch.rand(dim).to(self.device) <= p
+        sampled = torch.zeros(dim).to(self.device)
         sampled[true_list] = 1
         return sampled
 
