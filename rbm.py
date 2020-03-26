@@ -1,5 +1,6 @@
 import time
 import numpy as np
+import torch
 
 class RBM:
     def __init__(self, n_visible=784, n_hidden=2, alpha=0.01):
@@ -15,7 +16,7 @@ class RBM:
 
     def train(self, data, n_epochs=2, n_CD=1):
         self.energy_records.clear()
-        self.data = data.reshape(-1, self.n_visible)
+        self.data = data
         self.__contrastive_divergence(self.data, n_epochs, n_CD)
         print("Training finished")
 
@@ -28,13 +29,9 @@ class RBM:
             v_t = self.__backward(h_t)
         return v_t
 
-    def sigmoid(self, x):
-        return 1 / (1 + np.exp(-x))
-
     def __contrastive_divergence(self, data, n_epochs, n_CD):
         train_time = []
         for e in range(n_epochs):
-            np.random.shuffle(data)
             self.energy_list = []
 
             start = time.time()
@@ -46,8 +43,8 @@ class RBM:
                     h_sampled = self.__forward(v_sampled)
 
                 self.weight += self.alpha * \
-                               (np.matmul(v_0.reshape(self.n_visible, 1), h0_sampled.reshape(1, self.n_hidden)) -
-                                np.matmul(v_sampled.reshape(self.n_visible, 1), h_sampled.reshape(1, self.n_hidden)))
+                               (torch.matmul(v_0.view(-1, 1), h0_sampled.view(1, -1)) -
+                                torch.matmul(v_sampled.view(-1, 1), h_sampled.view(1, -1)))
                 self.b += self.alpha * (v_0 - v_sampled)
                 self.c += self.alpha * (h0_sampled - h_sampled)
                 self.energy_list.append(self._energy(v_0, h_sampled))
@@ -61,21 +58,21 @@ class RBM:
         print("Average Training Time: {:.2f}".format(np.mean(train_time)))
 
     def __forward(self, v):
-        p_h = self.sigmoid(
-            np.matmul(np.transpose(self.weight), v) + self.c)
+        p_h = torch.sigmoid(
+            torch.matmul(torch.t(self.weight), v) + self.c)
         return self.__sampling(p_h)
 
     def __backward(self, h):
-        p_v = self.sigmoid(np.matmul(self.weight, h) + self.b)
+        p_v = torch.sigmoid(torch.matmul(self.weight, h) + self.b)
         return self.__sampling(p_v)
 
     def __sampling(self, p):
         dim = p.shape[0]
-        true_list = np.random.uniform(0, 1, dim) <= p
-        sampled = np.zeros((dim,))
+        true_list = torch.rand(dim) <= p
+        sampled = torch.zeros(dim)
         sampled[true_list] = 1
         return sampled
 
     def _energy(self, v, h):
-        return - np.inner(self.b.flatten(), v.flatten()) - np.inner(self.c.flatten(), h.flatten()) \
-               - np.matmul(np.matmul(v.transpose(), self.weight), h)
+        return - torch.dot(self.b, v) - torch.dot(self.c, h) \
+               - torch.matmul(torch.matmul(torch.t(v), self.weight), h)
