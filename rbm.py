@@ -23,7 +23,7 @@ class RBM:
 
     def sample(self, n_iter=5, v_init=None):
         if v_init is None:
-            v_init = np.random.rand(self.n_visible).to(self.device)
+            v_init = torch.randint(2, size=(1, self.n_visible)).float().to(self.device)
         v_t = v_init.view(self.n_visible)
         for _ in range(n_iter):
             h_t = self.__forward(v_t)
