@@ -10,9 +10,9 @@ class RBM:
         self.device    = device
 
         self.data = None
-        self.weight = torch.rand(self.n_visible, self.n_hidden).to(self.device)
-        self.b = torch.rand(self.n_visible).to(self.device)
-        self.c = torch.rand(self.n_hidden).to(self.device)
+        self.weight = torch.FloatTensor(self.n_visible, self.n_hidden).uniform_(-1, 1).to(self.device)
+        self.b = torch.FloatTensor(self.n_visible).uniform_(-1, 1).to(self.device)
+        self.c = torch.FloatTensor(self.n_hidden).uniform_(-1, 1).to(self.device)
         self.energy_records = []
 
     def train(self, data, n_epochs=2, n_CD=1):
