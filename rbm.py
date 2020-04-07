@@ -13,13 +13,13 @@ class RBM:
         self.c = np.random.uniform(-1, 1, self.n_hidden)
         self.energy_records = []
 
-    def train(self, data, n_epochs=2, n_CD=1, sampler="cd"):
+    def train(self, data, n_epochs=2, batch_size=10000, n_CD=1, sampler="cd"):
         self.energy_records.clear()
         self.data = data
         if sampler == "cd":
-            self.__contrastive_divergence(self.data, n_epochs, n_CD)
+            self.__contrastive_divergence(self.data, n_epochs, batch_size, n_CD)
         elif sampler == "sqa":
-            self.__sqa(self.data, n_epochs)
+            self.__sqa(self.data, n_epochs, batch_size)
         else:
             raise ValueError("Sampler name is incorrect.")
 
@@ -35,7 +35,7 @@ class RBM:
     def sigmoid(self, x):
         return 1.0 / (1.0 + np.exp(-x))
 
-    def __sqa(self, data, n_epochs, batch_size=10000):
+    def __sqa(self, data, n_epochs, batch_size):
         train_time = []
         for e in range(n_epochs):
             self.energy_list = []
@@ -61,7 +61,7 @@ class RBM:
             train_time.append(end - start)
         print("Average Training Time: {:.2f}".format(np.mean(train_time)))
 
-    def __contrastive_divergence(self, data, n_epochs, n_CD):
+    def __contrastive_divergence(self, data, n_epochs, batch_size, n_CD):
         train_time = []
         for e in range(n_epochs):
             self.energy_list = []
