@@ -45,7 +45,7 @@ class RBM:
                 if len(batch) != batch_size:
                     break
                 v_0 = batch.mean(axis=0)
-                h0_sampled = self.__forward(v_0)
+                h0_sampled, _ = self.__forward(v_0)
                 model = sqapy.BipartiteGraph(self.b, self.c, self.W)
                 sampler = sqapy.SQASampler(model, steps=10)
                 _, states = sampler.sample(n_sample=2)
@@ -70,15 +70,14 @@ class RBM:
             indexes = np.random.permutation(data.shape[0])
             for i in indexes:
                 v_0 = data[i]
-                h0_sampled = self.__forward(v_0)
+                h0_sampled, h0_prob = self.__forward(v_0)
                 h_sampled = h0_sampled
                 for _ in range(n_CD):
-                    v_sampled = self.__backward(h_sampled)
-                    h_sampled = self.__forward(v_sampled)
+                    v_sampled, _ = self.__backward(h_sampled)
+                    h_sampled, h_prob = self.__forward(v_sampled)
 
-                self.__update_params(v_0, v_sampled, h0_sampled, h_sampled)
+                self.__update_params(v_0, h0_prob, v_sampled, h_prob)
                 self.energy_list.append(self._energy(v_0, h_sampled).item())
-
                 error += np.sum((v_0 - v_sampled) ** 2)
             end = time.time()
             avg_energy = np.mean(self.energy_list)
@@ -88,20 +87,20 @@ class RBM:
             train_time.append(end - start)
         print("Average Training Time: {:.2f}".format(np.mean(train_time)))
 
-    def __update_params(self, v_0, v_sampled, h0, h_sampled):
+    def __update_params(self, v_0, h0_prob, v_sampled, h_prob):
         self.W += self.alpha * \
-                       (np.matmul(v_0.reshape(self.n_visible, 1), h0.reshape(1, self.n_hidden)) -
-                        np.matmul(v_sampled.reshape(self.n_visible, 1), h_sampled.reshape(1, self.n_hidden)))
+                       (np.matmul(v_0.reshape(self.n_visible, 1), h0_prob.reshape(1, self.n_hidden)) -
+                        np.matmul(v_sampled.reshape(self.n_visible, 1), h_prob.reshape(1, self.n_hidden)))
         self.b += self.alpha * (v_0 - v_sampled)
-        self.c += self.alpha * (h0 - h_sampled)
+        self.c += self.alpha * (h0_prob - h_prob)
 
     def __forward(self, v):
-        p_h = self.sigmoid(np.matmul(v, self.W) + self.c)
-        return self.__sampling(p_h)
+        h_prob = self.sigmoid(np.matmul(v, self.W) + self.c)
+        return self.__sampling(h_prob), h_prob
 
     def __backward(self, h):
-        p_v = self.sigmoid(np.matmul(self.W, h) + self.b)
-        return self.__sampling(p_v)
+        v_prob = self.sigmoid(np.matmul(self.W, h) + self.b)
+        return self.__sampling(v_prob), v_prob
 
     def __sampling(self, p):
         dim = p.shape[0]
