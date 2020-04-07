@@ -65,6 +65,7 @@ class RBM:
         train_time = []
         for e in range(n_epochs):
             self.energy_list = []
+            error = 0
             start = time.time()
             indexes = np.random.permutation(data.shape[0])
             for i in indexes:
@@ -78,10 +79,11 @@ class RBM:
                 self.__update_params(v_0, v_sampled, h0_sampled, h_sampled)
                 self.energy_list.append(self._energy(v_0, h_sampled).item())
 
+                error += np.sum((v_0 - v_sampled) ** 2)
             end = time.time()
             avg_energy = np.mean(self.energy_list)
-            print("[epoch {}] takes {:.2f}s, average energy={}".format(
-                e, end - start, avg_energy))
+            print("[epoch {}] takes {:.2f}s, average energy={}, error={}".format(
+                e, end - start, avg_energy, error))
             self.energy_records.append(avg_energy)
             train_time.append(end - start)
         print("Average Training Time: {:.2f}".format(np.mean(train_time)))
@@ -94,8 +96,7 @@ class RBM:
         self.c += self.alpha * (h0 - h_sampled)
 
     def __forward(self, v):
-        p_h = self.sigmoid(
-            np.matmul(np.transpose(self.W), v) + self.c)
+        p_h = self.sigmoid(np.matmul(v, self.W) + self.c)
         return self.__sampling(p_h)
 
     def __backward(self, h):
