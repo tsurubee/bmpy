@@ -2,6 +2,7 @@ import time
 import numpy as np
 import sqapy
 
+
 class RBM:
     def __init__(self, n_visible=784, n_hidden=100, alpha=0.01, pi=None):
         self.n_visible = n_visible
@@ -19,7 +20,7 @@ class RBM:
         self.energy_records = []
 
     def train(self, data, n_epochs=2, batch_size=10000, method="cd1", sampler=None,
-              params={"n_CD": 1, "steps":10, "n_sample":2}):
+              params={"n_CD": 1, "steps": 100, "trotter": 10, "n_sample": 2}):
         self.energy_records.clear()
         self.data = data
         self.n_data = data.shape[0]
@@ -36,20 +37,20 @@ class RBM:
 
         train_time = []
         for e in range(n_epochs):
+            start = time.time()
             self.energy_list = []
             error = 0
-            start = time.time()
             rand_idx = np.random.permutation(self.n_data)
             for i in range(0, self.n_data, batch_size):
                 batch = data[rand_idx[i:i + batch_size if i + batch_size < self.n_data else self.n_data]]
-                v_0, h0, v_sampled, h_sampled = sampler(batch, params)
-                self.__update_params(v_0, h0, v_sampled, h_sampled)
+                v0, h0, v_sampled, h_sampled = sampler(batch, params)
+                self.__update_params(v0, h0, v_sampled, h_sampled)
                 # self.energy_list.append(self._energy(v_0, h_sampled).item())
-                error += np.sum((v_0 - v_sampled) ** 2)
+                # error += np.sum((v0 - v_sampled) ** 2)
 
             end = time.time()
             #avg_energy = np.mean(self.energy_list)
-            print("[epoch {}] takes {:.2f}s, error={}".format(e, end - start, error))
+            print("[epoch {}] takes {:.2f}s, error={}".format(e+1, end - start, error))
             #self.energy_records.append(avg_energy)
             train_time.append(end - start)
             print("Average Training Time: {:.2f}".format(np.mean(train_time)))
@@ -69,11 +70,11 @@ class RBM:
     def __sqa(self, v_0, params):
         h0_sampled, _ = self.__forward(v_0)
         model = sqapy.BipartiteGraph(self.b, self.c, self.W)
-        sampler = sqapy.SQASampler(model, params["steps"])
-        _, states = sampler.sample(params["n_sample"])
+        sampler = sqapy.SQASampler(model, trotter=params["trotter"], steps=params["steps"])
+        _, states = sampler.sample(n_sample=params["n_sample"])
         states = np.array(states).mean(axis=0)
-        v_sampled = np.array(states[:len(self.b)])
-        h_sampled = np.array(states[len(self.b):])
+        v_sampled = states[:len(self.b)]
+        h_sampled = states[len(self.b):]
         return v_0.mean(axis=0), h0_sampled.mean(axis=0), v_sampled, h_sampled
 
     def __contrastive_divergence(self, v_0, params):
