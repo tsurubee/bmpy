@@ -18,15 +18,20 @@ class RBM:
         self.c = np.zeros(self.n_hidden)
         self.energy_records = []
 
-    def train(self, data, n_epochs=2, batch_size=10000, n_CD=1, sampler="cd"):
+    def train(self, data, n_epochs=2, batch_size=10000, method="cd1", sampler=None):
         self.energy_records.clear()
         self.data = data
-        if sampler == "cd":
-            self.__contrastive_divergence(self.data, n_epochs, batch_size, n_CD)
-        elif sampler == "sqa":
-            self.__sqa(self.data, n_epochs, batch_size)
-        else:
-            raise ValueError("Sampler name is incorrect.")
+        self.n_data = data.shape[0]
+        if sampler is None:
+            if method == "cd1":
+                # ToDo: Support CD-k training
+                self.n_CD = 1
+                sampler = self.__contrastive_divergence
+            elif method == "sqa":
+                sampler = self.__sqa
+            else:
+                raise ValueError("{} is incorrect as sampling method name.".format(method))
+        sampler(self.data, n_epochs, batch_size)
 
     def sample(self, n_iter=5, v_init=None):
         if v_init is None:
@@ -45,10 +50,9 @@ class RBM:
         for e in range(n_epochs):
             self.energy_list = []
             start = time.time()
-            for i in range(0, data.shape[0], batch_size):
-                batch = data[i:i+batch_size]
-                if len(batch) != batch_size:
-                    break
+            rand_idx = np.random.permutation(self.n_data)
+            for i in range(0, self.n_data, batch_size):
+                batch = data[rand_idx[i:i+batch_size if i+batch_size < self.n_data else self.n_data]]
                 v_0 = batch.mean(axis=0)
                 h0_sampled, _ = self.__forward(v_0)
                 model = sqapy.BipartiteGraph(self.b, self.c, self.W)
@@ -56,7 +60,7 @@ class RBM:
                 _, states = sampler.sample(n_sample=2)
                 v_sampled = np.array(states[0][:len(self.b)])
                 h_sampled = np.array(states[0][len(self.b):])
-                self.__update_params(v_0, v_sampled, h0_sampled, h_sampled)
+                self.__update_params(v_0, h0_sampled, v_sampled, h_sampled)
                 self.energy_list.append(self._energy(v_0, h_sampled).item())
             end = time.time()
             avg_energy = np.mean(self.energy_list)
@@ -66,18 +70,18 @@ class RBM:
             train_time.append(end - start)
         print("Average Training Time: {:.2f}".format(np.mean(train_time)))
 
-    def __contrastive_divergence(self, data, n_epochs, batch_size, n_CD):
+    def __contrastive_divergence(self, data, n_epochs, batch_size):
         train_time = []
         for e in range(n_epochs):
             self.energy_list = []
             error = 0
             start = time.time()
-            indexes = np.random.permutation(data.shape[0])
+            indexes = np.random.permutation(self.n_data)
             for i in indexes:
                 v_0 = data[i]
                 h0_sampled, h0_prob = self.__forward(v_0)
                 h_sampled = h0_sampled
-                for _ in range(n_CD):
+                for _ in range(self.n_CD):
                     v_sampled, _ = self.__backward(h_sampled)
                     h_sampled, h_prob = self.__forward(v_sampled)
 
