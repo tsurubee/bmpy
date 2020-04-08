@@ -18,20 +18,41 @@ class RBM:
         self.c = np.zeros(self.n_hidden)
         self.energy_records = []
 
-    def train(self, data, n_epochs=2, batch_size=10000, method="cd1", sampler=None):
+    def train(self, data, n_epochs=2, batch_size=10000, method="cd1", sampler=None,
+              params={"n_CD": 1, "steps":10, "n_sample":2}):
         self.energy_records.clear()
         self.data = data
         self.n_data = data.shape[0]
         if sampler is None:
-            if method == "cd1":
-                # ToDo: Support CD-k training
-                self.n_CD = 1
+            if method == "cd":
                 sampler = self.__contrastive_divergence
             elif method == "sqa":
                 sampler = self.__sqa
+            elif method == "api":
+                # ToDo: Support sampling from API
+                pass
             else:
                 raise ValueError("{} is incorrect as sampling method name.".format(method))
-        sampler(self.data, n_epochs, batch_size)
+
+        train_time = []
+        for e in range(n_epochs):
+            self.energy_list = []
+            error = 0
+            start = time.time()
+            rand_idx = np.random.permutation(self.n_data)
+            for i in range(0, self.n_data, batch_size):
+                batch = data[rand_idx[i:i + batch_size if i + batch_size < self.n_data else self.n_data]]
+                v_0, h0, v_sampled, h_sampled = sampler(batch, params)
+                self.__update_params(v_0, h0, v_sampled, h_sampled)
+                # self.energy_list.append(self._energy(v_0, h_sampled).item())
+                error += np.sum((v_0 - v_sampled) ** 2)
+
+            end = time.time()
+            #avg_energy = np.mean(self.energy_list)
+            print("[epoch {}] takes {:.2f}s, error={}".format(e, end - start, error))
+            #self.energy_records.append(avg_energy)
+            train_time.append(end - start)
+            print("Average Training Time: {:.2f}".format(np.mean(train_time)))
 
     def sample(self, n_iter=5, v_init=None):
         if v_init is None:
@@ -45,56 +66,23 @@ class RBM:
     def sigmoid(self, x):
         return 1.0 / (1.0 + np.exp(-x))
 
-    def __sqa(self, data, n_epochs, batch_size):
-        train_time = []
-        for e in range(n_epochs):
-            self.energy_list = []
-            start = time.time()
-            rand_idx = np.random.permutation(self.n_data)
-            for i in range(0, self.n_data, batch_size):
-                batch = data[rand_idx[i:i+batch_size if i+batch_size < self.n_data else self.n_data]]
-                v_0 = batch.mean(axis=0)
-                h0_sampled, _ = self.__forward(v_0)
-                model = sqapy.BipartiteGraph(self.b, self.c, self.W)
-                sampler = sqapy.SQASampler(model, steps=10)
-                _, states = sampler.sample(n_sample=2)
-                v_sampled = np.array(states[0][:len(self.b)])
-                h_sampled = np.array(states[0][len(self.b):])
-                self.__update_params(v_0, h0_sampled, v_sampled, h_sampled)
-                self.energy_list.append(self._energy(v_0, h_sampled).item())
-            end = time.time()
-            avg_energy = np.mean(self.energy_list)
-            print("[epoch {}] takes {:.2f}s, average energy={}".format(
-                e, end - start, avg_energy))
-            self.energy_records.append(avg_energy)
-            train_time.append(end - start)
-        print("Average Training Time: {:.2f}".format(np.mean(train_time)))
+    def __sqa(self, v_0, params):
+        h0_sampled, _ = self.__forward(v_0)
+        model = sqapy.BipartiteGraph(self.b, self.c, self.W)
+        sampler = sqapy.SQASampler(model, params["steps"])
+        _, states = sampler.sample(params["n_sample"])
+        states = np.array(states).mean(axis=0)
+        v_sampled = np.array(states[:len(self.b)])
+        h_sampled = np.array(states[len(self.b):])
+        return v_0.mean(axis=0), h0_sampled.mean(axis=0), v_sampled, h_sampled
 
-    def __contrastive_divergence(self, data, n_epochs, batch_size):
-        train_time = []
-        for e in range(n_epochs):
-            self.energy_list = []
-            error = 0
-            start = time.time()
-            indexes = np.random.permutation(self.n_data)
-            for i in indexes:
-                v_0 = data[i]
-                h0_sampled, h0_prob = self.__forward(v_0)
-                h_sampled = h0_sampled
-                for _ in range(self.n_CD):
-                    v_sampled, _ = self.__backward(h_sampled)
-                    h_sampled, h_prob = self.__forward(v_sampled)
-
-                self.__update_params(v_0, h0_prob, v_sampled, h_prob)
-                self.energy_list.append(self._energy(v_0, h_sampled).item())
-                error += np.sum((v_0 - v_sampled) ** 2)
-            end = time.time()
-            avg_energy = np.mean(self.energy_list)
-            print("[epoch {}] takes {:.2f}s, average energy={}, error={}".format(
-                e, end - start, avg_energy, error))
-            self.energy_records.append(avg_energy)
-            train_time.append(end - start)
-        print("Average Training Time: {:.2f}".format(np.mean(train_time)))
+    def __contrastive_divergence(self, v_0, params):
+        h0_sampled, h0_prob = self.__forward(v_0)
+        h_sampled = h0_sampled
+        for _ in range(params["n_CD"]):
+            v_sampled, _ = self.__backward(h_sampled)
+            h_sampled, h_prob = self.__forward(v_sampled)
+        return v_0.mean(axis=0), h0_prob.mean(axis=0), v_sampled.mean(axis=0), h_prob.mean(axis=0)
 
     def __update_params(self, v_0, h0_prob, v_sampled, h_prob):
         self.W += self.alpha * \
@@ -108,13 +96,13 @@ class RBM:
         return self.__sampling(h_prob), h_prob
 
     def __backward(self, h):
-        v_prob = self.sigmoid(np.matmul(self.W, h) + self.b)
+        v_prob = self.sigmoid(np.matmul(h, self.W.T) + self.b)
         return self.__sampling(v_prob), v_prob
 
     def __sampling(self, p):
-        dim = p.shape[0]
+        dim = p.shape
         true_list = np.random.uniform(0, 1, dim) <= p
-        sampled = np.zeros((dim,))
+        sampled = np.zeros((dim))
         sampled[true_list] = 1
         return sampled
 
