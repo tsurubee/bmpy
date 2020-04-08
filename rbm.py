@@ -3,14 +3,19 @@ import numpy as np
 import sqapy
 
 class RBM:
-    def __init__(self, n_visible=784, n_hidden=100, alpha=0.01):
+    def __init__(self, n_visible=784, n_hidden=100, alpha=0.01, pi=None):
         self.n_visible = n_visible
         self.n_hidden  = n_hidden
         self.alpha     = alpha
         self.data = None
-        self.W = np.random.uniform(-1, 1, (self.n_visible, self.n_hidden))
-        self.b = np.random.uniform(-1, 1, self.n_visible)
-        self.c = np.random.uniform(-1, 1, self.n_hidden)
+        # The initial values of the weights and biases decided with reference to the paper
+        # "A Practical Guide to Training Restricted Boltzmann Machines".
+        self.W = np.random.normal(0, 0.01, (self.n_visible, self.n_hidden))
+        if pi is not None:
+            self.b = np.full(self.n_visible, np.log(pi/(1-pi)))
+        else:
+            self.b = np.zeros(self.n_visible)
+        self.c = np.zeros(self.n_hidden)
         self.energy_records = []
 
     def train(self, data, n_epochs=2, batch_size=10000, n_CD=1, sampler="cd"):
