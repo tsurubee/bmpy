@@ -56,7 +56,7 @@ class RBM:
 
     def reconstruction_error(self, data, n_iter=1):
         v_sampled, _ = self.sample(n_iter, v_init=data)
-        return np.sum((data - v_sampled) ** 2) / len(data)
+        return np.sum((data - v_sampled) ** 2) / data.shape[1] / len(data)
 
     def sample(self, n_iter=5, v_init=None):
         if v_init is None:
