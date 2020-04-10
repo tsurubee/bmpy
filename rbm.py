@@ -1,14 +1,20 @@
+import os
 import time
 import numpy as np
 import sqapy
+import pickle
+from datetime import datetime
 
 
 class RBM:
-    def __init__(self, n_visible=784, n_hidden=100, alpha=0.01, pi=None):
+    def __init__(self, n_visible=784, n_hidden=100, alpha=0.01, pi=None, save_model=False, save_path="./results"):
         self.n_visible = n_visible
         self.n_hidden  = n_hidden
         self.alpha     = alpha
-        self.data = None
+        self.save_path = save_path
+        self.save_model = save_model
+        if self.save_model:
+            self.save_path = os.path.join(self.save_path, datetime.now().strftime('%Y%m%d_%H%M%S'))
         # The initial values of the weights and biases decided with reference to the paper
         # "A Practical Guide to Training Restricted Boltzmann Machines".
         self.W = np.random.normal(0, 0.01, (self.n_visible, self.n_hidden))
@@ -20,7 +26,6 @@ class RBM:
 
     def train(self, data, n_epochs=2, batch_size=10000, method="cd1", sampler=None,
               params={"n_CD": 1, "steps": 100, "trotter": 10, "n_sample": 2}):
-        self.data = data
         self.n_data = data.shape[0]
         if sampler is None:
             if method == "cd":
@@ -45,6 +50,8 @@ class RBM:
             end = time.time()
             training_time.append(end - start)
             print("[epoch {}] takes {:.2f}s".format(e + 1, end - start))
+            if self.save_model:
+                self.__save_model(e)
         print("Average Training Time: {:.2f}".format(np.mean(training_time)))
 
     def reconstruction_error(self, data, n_iter=1):
@@ -62,6 +69,11 @@ class RBM:
 
     def sigmoid(self, x):
         return 1.0 / (1.0 + np.exp(-x))
+
+    def __save_model(self, epoch):
+        os.makedirs(self.save_path, exist_ok=True)
+        with open(os.path.join(self.save_path, "epoch{}.pickle".format(epoch+1)), mode="wb") as f:
+            pickle.dump(self, f)
 
     def __sqa(self, v_0, params):
         h0_sampled, _ = self.__forward(v_0)
