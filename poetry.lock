@@ -544,8 +544,8 @@ category = "main"
 description = "Simulated quantum annealing implemented in Python"
 name = "sqapy"
 optional = false
-python-versions = ">=3.8,<4.0"
-version = "0.1.0"
+python-versions = ">=3.7,<4.0"
+version = "0.1.1"
 
 [package.dependencies]
 numpy = ">=1.18.2,<2.0.0"
@@ -640,7 +640,7 @@ python-versions = "*"
 version = "0.5.1"
 
 [metadata]
-content-hash = "bbfe72486cfd4ef1d0fa8cf4fc305dbe52a1dacbaacef8f509d5b34a9dabb6df"
+content-hash = "9f970ed3a191ca295f89969cdff7a92488946d244b808d56ec4467b97a94116a"
 python-versions = "^3.8"
 
 [metadata.files]
@@ -963,8 +963,8 @@ six = [
     {file = "six-1.14.0.tar.gz", hash = "sha256:236bdbdce46e6e6a3d61a337c0f8b763ca1e8717c03b369e87a7ec7ce1319c0a"},
 ]
 sqapy = [
-    {file = "sqapy-0.1.0-py3-none-any.whl", hash = "sha256:ea89f2003b0150534465a5a4b53ed036820db5da10ff53981f19b0f50653cd3d"},
-    {file = "sqapy-0.1.0.tar.gz", hash = "sha256:8183f041fe8a81ebd7c58b09be066d6e546fbf42bc0ae62a3ceb9d9f89c6d7c5"},
+    {file = "sqapy-0.1.1-py3-none-any.whl", hash = "sha256:fffa126e8e50eb78d61fde1cee19e5ae235a30ad6b08723f1a5fe3f42b643ade"},
+    {file = "sqapy-0.1.1.tar.gz", hash = "sha256:18ede3f244d486cca8efe60da2bf5868ab6475eb7cd68e18f79abcc4b512c9d5"},
 ]
 terminado = [
     {file = "terminado-0.8.3-py2.py3-none-any.whl", hash = "sha256:a43dcb3e353bc680dd0783b1d9c3fc28d529f190bc54ba9a229f72fe6e7a54d7"},
