@@ -17,11 +17,9 @@ class RBM:
         else:
             self.b = np.zeros(self.n_visible)
         self.c = np.zeros(self.n_hidden)
-        self.energy_records = []
 
     def train(self, data, n_epochs=2, batch_size=10000, method="cd1", sampler=None,
               params={"n_CD": 1, "steps": 100, "trotter": 10, "n_sample": 2}):
-        self.energy_records.clear()
         self.data = data
         self.n_data = data.shape[0]
         if sampler is None:
@@ -35,30 +33,28 @@ class RBM:
             else:
                 raise ValueError("{} is incorrect as sampling method name.".format(method))
 
-        train_time = []
+        training_time = []
         for e in range(n_epochs):
             start = time.time()
-            self.energy_list = []
             error = 0
             rand_idx = np.random.permutation(self.n_data)
             for i in range(0, self.n_data, batch_size):
                 batch = data[rand_idx[i:i + batch_size if i + batch_size < self.n_data else self.n_data]]
                 v0, h0, v_sampled, h_sampled = sampler(batch, params)
                 self.__update_params(v0, h0, v_sampled, h_sampled)
-                # self.energy_list.append(self._energy(v_0, h_sampled).item())
-                # error += np.sum((v0 - v_sampled) ** 2)
-
             end = time.time()
-            #avg_energy = np.mean(self.energy_list)
-            print("[epoch {}] takes {:.2f}s, error={}".format(e+1, end - start, error))
-            #self.energy_records.append(avg_energy)
-            train_time.append(end - start)
-            print("Average Training Time: {:.2f}".format(np.mean(train_time)))
+            training_time.append(end - start)
+            print("[epoch {}] takes {:.2f}s".format(e + 1, end - start))
+        print("Average Training Time: {:.2f}".format(np.mean(training_time)))
+
+    def reconstruction_error(self, data, n_iter=1):
+        v_sampled, _ = self.sample(n_iter, v_init=data)
+        return np.sum((data - v_sampled) ** 2) / len(data)
 
     def sample(self, n_iter=5, v_init=None):
         if v_init is None:
             v_init = np.random.rand(self.n_visible).round()
-        v_t = v_init.reshape(self.n_visible)
+        v_t = v_init
         for _ in range(n_iter):
             h_t = self.__forward(v_t)
             v_t = self.__backward(h_t)
