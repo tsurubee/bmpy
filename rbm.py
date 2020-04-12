@@ -63,8 +63,8 @@ class RBM:
             v_init = np.random.rand(self.n_visible).round()
         v_t = v_init
         for _ in range(n_iter):
-            h_t = self.__forward(v_t)
-            v_t = self.__backward(h_t)
+            h_t, _ = self.__forward(v_t)
+            v_t, _ = self.__backward(h_t)
         return v_t, h_t
 
     def sigmoid(self, x):
