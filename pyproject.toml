@@ -9,6 +9,7 @@ license = "MIT"
 python = "^3.7"
 numpy = "^1.18.1"
 sqapy = "^0.1.1"
+sqaod = "^1.0.2"
 
 [tool.poetry.dev-dependencies]
 matplotlib = "^3.2.1"
