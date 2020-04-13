@@ -2,6 +2,7 @@ import os
 import time
 import numpy as np
 import sqapy
+import sqaod as sq
 import pickle
 from datetime import datetime
 
@@ -25,13 +26,16 @@ class RBM:
         self.c = np.zeros(self.n_hidden)
 
     def train(self, data, n_epochs=2, batch_size=10000, method="cd1", sampler=None,
-              params={"n_CD": 1, "steps": 100, "trotter": 10, "n_sample": 2}):
+              params={"n_CD": 1, "steps": 100, "trotter": 10, "n_sample": 1, "beta": 50,
+                      "Ginit": 5., "Gfin": 0.001, "tau": 0.99}):
         self.n_data = data.shape[0]
         if sampler is None:
             if method == "cd":
                 sampler = self.__contrastive_divergence
             elif method == "sqa":
                 sampler = self.__sqa
+            elif method == "sqapy":
+                sampler = self.__sqapy
             elif method == "api":
                 # ToDo: Support sampling from API
                 pass
@@ -77,6 +81,37 @@ class RBM:
             pickle.dump(self, f)
 
     def __sqa(self, v_0, params):
+        h0_sampled, h0_prob = self.__forward(v_0)
+        sol = sq.cpu
+        if sq.is_cuda_available():
+            import sqaod.cuda
+            sol = sqaod.cuda
+        ann = sol.bipartite_graph_annealer()
+        ann.seed(13255)
+        ann.set_qubo(self.b, self.c, self.W.T, sq.maximize)
+        ann.set_preferences(n_trotters=params["trotter"])
+        ann.prepare()
+        ann.randomize_spin()
+        Ginit = params["Ginit"]
+        Gfin = params["Gfin"]
+        beta = params["beta"]
+        tau = params["tau"]
+        v_sampled = np.zeros(self.n_visible)
+        h_sampled = np.zeros(self.n_hidden)
+        for _ in range(params["n_sample"]):
+            G = Ginit
+            while Gfin <= G:
+                ann.anneal_one_step(G, beta)
+                G *= tau
+            xlist = ann.get_x()
+            best_index = np.argmax(ann.get_E())
+            v_sampled += xlist[best_index][0]
+            h_sampled += xlist[best_index][1]
+        v_sampled = v_sampled / params["n_sample"]
+        h_sampled = h_sampled / params["n_sample"]
+        return v_0.mean(axis=0), h0_prob.mean(axis=0), v_sampled, h_sampled
+
+    def __sqapy(self, v_0, params):
         h0_sampled, _ = self.__forward(v_0)
         model = sqapy.BipartiteGraph(self.b, self.c, self.W)
         sampler = sqapy.SQASampler(model, trotter=params["trotter"], steps=params["steps"])
