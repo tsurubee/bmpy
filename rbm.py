@@ -68,8 +68,8 @@ class RBM:
         return v_t, h_t
 
     def sigmoid(self, x):
-        range = 34.538776394910684
-        return 1. / (1. + np.exp(-np.clip(x, -range, range)))
+        sig_range = 34.538776394910684
+        return 1. / (1. + np.exp(-np.clip(x, -sig_range, sig_range)))
 
     def __save_model(self, epoch):
         os.makedirs(self.save_path, exist_ok=True)
