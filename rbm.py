@@ -25,9 +25,7 @@ class RBM:
             self.b = np.zeros(self.n_visible)
         self.c = np.zeros(self.n_hidden)
 
-    def train(self, data, n_epochs=2, batch_size=10000, method="cd1", sampler=None,
-              params={"n_CD": 1, "steps": 100, "trotter": 10, "n_sample": 1, "beta": 50,
-                      "Ginit": 5., "Gfin": 0.001, "tau": 0.99}):
+    def train(self, data, n_epochs=2, batch_size=10000, method="cd", sampler=None, **kwargs):
         self.n_data = data.shape[0]
         if sampler is None:
             if method == "cd":
@@ -49,7 +47,7 @@ class RBM:
             rand_idx = np.random.permutation(self.n_data)
             for i in range(0, self.n_data, batch_size):
                 batch = data[rand_idx[i:i + batch_size if i + batch_size < self.n_data else self.n_data]]
-                v0, h0, v_sampled, h_sampled = sampler(batch, params)
+                v0, h0, v_sampled, h_sampled = sampler(batch, kwargs)
                 self.__update_params(v0, h0, v_sampled, h_sampled)
             end = time.time()
             training_time.append(end - start)
@@ -89,16 +87,17 @@ class RBM:
         ann = sol.bipartite_graph_annealer()
         ann.seed(13255)
         ann.set_qubo(self.b, self.c, self.W.T, sq.maximize)
-        ann.set_preferences(n_trotters=params["trotter"])
+        ann.set_preferences(n_trotters=params.get("trotter", 10))
         ann.prepare()
         ann.randomize_spin()
-        Ginit = params["Ginit"]
-        Gfin = params["Gfin"]
-        beta = params["beta"]
-        tau = params["tau"]
+        Ginit = params.get("Ginit", 5.)
+        Gfin = params.get("Gfin", 0.001)
+        beta = params.get("beta", 50)
+        tau = params.get("tau", 0.99)
         v_sampled = np.zeros(self.n_visible)
         h_sampled = np.zeros(self.n_hidden)
-        for _ in range(params["n_sample"]):
+        n_sample = params.get("n_sample", 1)
+        for _ in range(n_sample):
             G = Ginit
             while Gfin <= G:
                 ann.anneal_one_step(G, beta)
@@ -107,15 +106,15 @@ class RBM:
             best_index = np.argmax(ann.get_E())
             v_sampled += xlist[best_index][0]
             h_sampled += xlist[best_index][1]
-        v_sampled = v_sampled / params["n_sample"]
-        h_sampled = h_sampled / params["n_sample"]
+        v_sampled = v_sampled / n_sample
+        h_sampled = h_sampled / n_sample
         return v_0.mean(axis=0), h0_prob.mean(axis=0), v_sampled, h_sampled
 
     def __sqapy(self, v_0, params):
         h0_sampled, _ = self.__forward(v_0)
         model = sqapy.BipartiteGraph(self.b, self.c, self.W)
-        sampler = sqapy.SQASampler(model, trotter=params["trotter"], steps=params["steps"])
-        _, states = sampler.sample(n_sample=params["n_sample"])
+        sampler = sqapy.SQASampler(model, trotter=params.get("trotter", 10), steps=params.get("steps", 100))
+        _, states = sampler.sample(n_sample=params.get("n_sample", 1))
         states = np.array(states).mean(axis=0)
         v_sampled = states[:len(self.b)]
         h_sampled = states[len(self.b):]
@@ -124,7 +123,7 @@ class RBM:
     def __contrastive_divergence(self, v_0, params):
         h0_sampled, h0_prob = self.__forward(v_0)
         h_sampled = h0_sampled
-        for _ in range(params["n_CD"]):
+        for _ in range(params.get("n_CD", 1)):
             v_sampled, _ = self.__backward(h_sampled)
             h_sampled, h_prob = self.__forward(v_sampled)
         return v_0.mean(axis=0), h0_prob.mean(axis=0), v_sampled.mean(axis=0), h_prob.mean(axis=0)
